@@ -1,53 +1,87 @@
 using UnityEngine;
-using UnityEngine.UI; // For UI Button
+using UnityEngine.UI;
 
 public class CarSpawner : MonoBehaviour
 {
     [Header("Car Prefab")]
-    public GameObject carPrefab; // Assign your Car prefab (with CarAI component)
+    public GameObject carPrefab;
 
     [Header("Spawn Points")]
-    public Transform[] spawnPoints; // Assign multiple spawn point Transforms in the Inspector
+    public Transform[] spawnPoints;
 
-    [Header("Button")]
-    public Button spawnButton; // Assign your UI Button here
+    [Header("Routes (From Hierarchy)")]
+    public Transform[] startRoute;
+    public Transform[] route_1;
+    public Transform[] route_2;
+    public Transform[] route_3;
+    public Transform[] route_4;  // NEW: Route 4
+
+    [Header("Traffic Lights & Stop Points (Per Route)")]
+    public StopLight[] routeTrafficLights;   // Must match order: route_1, route_2, route_3, route_4
+    public Transform[] routeStopPoints;      // Same order
+
+    [Header("UI")]
+    public Button spawnButton;
+
+    private bool isButtonReady = true;
 
     private void Start()
     {
-        if (spawnButton != null)
+        SetupSpawnButton();
+    }
+
+    private void SetupSpawnButton()
+    {
+        if (spawnButton == null)
         {
-            spawnButton.onClick.AddListener(SpawnRandomCar);
-        }
-        else
-        {
-            Debug.LogWarning("Spawn Button not assigned!");
+            Debug.LogWarning("Spawn Button is not assigned!");
+            return;
         }
 
-        // Optional: Spawn one car automatically at start
-        // SpawnRandomCar();
+        spawnButton.onClick.RemoveAllListeners();
+        spawnButton.onClick.AddListener(SpawnRandomCar);
     }
 
     public void SpawnRandomCar()
     {
-        if (carPrefab == null)
+        if (!isButtonReady) return;
+        if (carPrefab == null || spawnPoints == null || spawnPoints.Length == 0)
         {
-            Debug.LogError("Car Prefab is not assigned!");
+            Debug.LogError("Car Prefab or Spawn Points not assigned!");
             return;
         }
 
-        if (spawnPoints == null || spawnPoints.Length == 0)
-        {
-            Debug.LogError("No spawn points assigned!");
-            return;
-        }
+        isButtonReady = false;
 
-        // Pick a random spawn point
         int randomIndex = Random.Range(0, spawnPoints.Length);
-        Transform chosenSpawn = spawnPoints[randomIndex];
+        Transform spawnPoint = spawnPoints[randomIndex];
 
-        // Spawn the car
-        GameObject newCar = Instantiate(carPrefab, chosenSpawn.position, chosenSpawn.rotation);
+        GameObject newCar = Instantiate(carPrefab, spawnPoint.position, spawnPoint.rotation);
 
-        Debug.Log($"Car spawned at {chosenSpawn.name}");
+        CarAI carAI = newCar.GetComponent<CarAI>();
+        if (carAI != null)
+        {
+            carAI.AssignSceneReferences(startRoute, route_1, route_2, route_3, route_4,
+                                        routeTrafficLights, routeStopPoints);
+
+            Debug.Log($"Car spawned at {spawnPoint.name}");
+        }
+        else
+        {
+            Debug.LogError("CarAI component missing on prefab!");
+        }
+
+        Invoke(nameof(ResetButton), 0.2f);
+    }
+
+    private void ResetButton()
+    {
+        isButtonReady = true;
+    }
+
+    private void OnDestroy()
+    {
+        if (spawnButton != null)
+            spawnButton.onClick.RemoveAllListeners();
     }
 }
