@@ -3,14 +3,14 @@ using UnityEngine;
 public class PedestrianAI : MonoBehaviour
 {
     [Header("Crossing Points")]
-    public Transform[] crossingPoints;   // ← Array: Start, Mid1, Mid2, ..., End
+    public Transform[] crossingPoints;   // Start, Mid1, Mid2, ..., End (will loop back to Start)
 
     [Header("Traffic Lights")]
     public StopLight[] trafficLights;
 
     [Header("Movement")]
     public float walkSpeed = 3.5f;
-    public float waitTimeAtEnd = 3f;
+    public float waitTimeAtEnd = 3f; // Now used as pause time before starting next loop
 
     private int currentTargetIndex = 0;
     private Vector3 targetPosition;
@@ -20,7 +20,7 @@ public class PedestrianAI : MonoBehaviour
         WaitingToStart,
         Moving,
         WaitingAtIntermediate,
-        Finished
+        // Removed Finished state - we now loop
     }
 
     private CrossingState currentState = CrossingState.WaitingToStart;
@@ -72,15 +72,6 @@ public class PedestrianAI : MonoBehaviour
                     StartMovingToNextPoint();
                 }
                 break;
-
-            case CrossingState.Finished:
-                waitTimer += Time.deltaTime;
-                if (waitTimer >= waitTimeAtEnd)
-                {
-                    // Optional: despawn, return to start, or loop
-                    Debug.Log($"<color=gray>[Pedestrian] Finished waiting at end ({gameObject.name})</color>");
-                }
-                break;
         }
     }
 
@@ -99,10 +90,7 @@ public class PedestrianAI : MonoBehaviour
 
     private void StartMovingToNextPoint()
     {
-        if (currentTargetIndex >= crossingPoints.Length - 1)
-            return;
-
-        currentTargetIndex++;
+        currentTargetIndex = (currentTargetIndex + 1) % crossingPoints.Length;
         targetPosition = crossingPoints[currentTargetIndex].position;
         currentState = CrossingState.Moving;
         waitingForNextRed = false;
@@ -114,12 +102,12 @@ public class PedestrianAI : MonoBehaviour
     {
         transform.position = targetPosition;
 
-        if (currentTargetIndex >= crossingPoints.Length - 1)
+        // If we just arrived at the last point, pause briefly then loop
+        if (currentTargetIndex == crossingPoints.Length - 1)
         {
-            // Final destination
-            currentState = CrossingState.Finished;
+            currentState = CrossingState.WaitingToStart;
             waitTimer = 0f;
-            Debug.Log($"<color=green>[Pedestrian] Reached final destination ({gameObject.name})</color>");
+            Debug.Log($"<color=green>[Pedestrian] Reached end of path - starting next loop ({gameObject.name})</color>");
         }
         else
         {
@@ -155,18 +143,13 @@ public class PedestrianAI : MonoBehaviour
         if (points != null && points.Length > 0)
         {
             transform.position = points[0].position;
+            currentTargetIndex = 0;
         }
 
-        currentTargetIndex = 0;
         currentState = CrossingState.WaitingToStart;
         waitTimer = 0f;
         waitingForNextRed = false;
 
-        Debug.Log($"<color=lime>[Pedestrian] Assigned {points?.Length} crossing points ({gameObject.name})</color>");
-    }
-
-    private void OnDestroy()
-    {
-        // Cleanup if needed
+        Debug.Log($"<color=lime>[Pedestrian] Assigned {points?.Length} crossing points (looping enabled) ({gameObject.name})</color>");
     }
 }
